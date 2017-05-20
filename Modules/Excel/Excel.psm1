@@ -3,7 +3,6 @@
     param(
         [Parameter(Mandatory = $True)]
         [string]$Path,
-        [Parameter(Mandatory = $True)]
         [string[]]$TableName,
         [string[]]$Header
     )
@@ -71,22 +70,61 @@ function Get-Table {
         [string[]]$TableName
     )
 
-    $map = [ordered]@{}
-    foreach ($xlSheet in $xlBook.Worksheets) {
-        $xlTables = $xlSheet.ListObjects
-        foreach ($xlTable in $xlTables) {
-            $map.Add($xlTable.Name, $xlTable)
+    begin {
+        function Get-AllTable {
+            param(
+                [Object]$xlBook
+            )
+
+            $existTable = $false
+            foreach ($xlSheet in $xlBook.Worksheets) {
+                $xlTables = $xlSheet.ListObjects
+                foreach ($xlTable in $xlTables) {
+                    $xlTable
+                    $existTable = $true
+                }
+                $xlSheet = $null
+            }
+
+            if (-not $existTable) {
+                $message = "テーブルが見つかりません。"
+                throw New-Object "System.ArgumentException" $message
+            }
         }
-        $xlSheet = $null
+
+        function Get-SpecificTable {
+            param(
+                [Object]$xlBook,
+                [string[]]$TableName
+            )
+
+            $map = [ordered]@{}
+            foreach ($xlSheet in $xlBook.Worksheets) {
+                $xlTables = $xlSheet.ListObjects
+                foreach ($xlTable in $xlTables) {
+                    $map.Add($xlTable.Name, $xlTable)
+                }
+                $xlSheet = $null
+            }
+
+            foreach ($key in $TableName) {
+                if ($map.Contains($key)) {
+                    $map.Item($key)
+                } else {
+                    $message = [String]::Format("テーブル '{0}' が見つかりません。", $key)
+                    throw New-Object "System.ArgumentException" $message
+                }
+            }
+        }
     }
 
-    foreach ($key in $TableName) {
-        if ($map.Contains($key)) {
-            $map.Item($key)
+    end {
+        if ($null -eq $TableName) {
+            Get-AllTable $xlBook
         } else {
-            $message = [String]::Format("テーブル '{0}' が見つかりません。", $key)
-            throw New-Object "System.ArgumentException" $message
+            Get-SpecificTable $xlBook $TableName
         }
+
     }
 }
 
