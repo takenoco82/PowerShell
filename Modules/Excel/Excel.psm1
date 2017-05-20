@@ -33,7 +33,7 @@
         }
 
     } catch [System.ArgumentException] {
-        Write-Error $Error[0]
+        Write-Error $_
     } catch [System.Exception] {
         Write-Error $Error[0]
     } finally {
