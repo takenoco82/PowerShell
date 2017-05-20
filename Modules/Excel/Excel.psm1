@@ -51,6 +51,45 @@
     }
 }
 
+function Get-ExcelTableName {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $True)]
+        [string]$Path
+    )
+
+    Write-Verbose "`$Path=$Path"
+
+    try {
+        $AbsolutePath = Get-AbsolutePath $Path
+
+        $xlApp = New-Object -ComObject "Excel.Application"
+
+        $xlBook = $xlApp.Workbooks.Open($AbsolutePath, 0, $true)
+        $xlTables = Get-Table $xlBook $TableName
+        foreach ($xlTable in $xlTables) {
+            $xlTable.Name
+        }
+
+    } catch [System.ArgumentException] {
+        Write-Error $_
+    } catch [System.Exception] {
+        Write-Error $Error[0]
+    } finally {
+        if ($xlBook -ne $null) {
+            $xlBook.Close()
+            $xlBook = $null
+        }
+
+        if ($xlApp -ne $null) {
+            $xlApp.Quit()
+            $xlApp = $null
+        }
+
+        [System.GC]::Collect()
+    }
+}
+
 function Get-AbsolutePath {
     param(
         [string]$Path
@@ -186,3 +225,4 @@ function Verify-Header {
 }
 
 Export-ModuleMember -Function Import-ExcelTable
+Export-ModuleMember -Function Get-ExcelTableName
