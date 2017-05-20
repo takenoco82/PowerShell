@@ -13,16 +13,12 @@
     if ($Header -ne $null) { Write-Verbose "`$Header=$($Header -join ', ')" }
 
     try {
-        # ファイル存在チェック
-        if (!(Test-Path -Path $Path)) {
-            Write-Error "ファイルが存在しません。Path=$Path"
-            return
-        }
+        $AbsolutePath = Get-AbsolutePath $Path
 
         $xlApp = New-Object -ComObject "Excel.Application"
         #$xlApp.Visible = $true
 
-        $xlBook = $xlApp.Workbooks.Open($Path, 0, $true)
+        $xlBook = $xlApp.Workbooks.Open($AbsolutePath, 0, $true)
         $xlTables = Get-Table $xlBook $TableName
 
         $IsFirst = $true
@@ -59,6 +55,19 @@
         # http://eriverjp.azurewebsites.net/2016/02/08/powershell-excel-exe%E3%81%8C%E3%82%B9%E3%82%AF%E3%83%AA%E3%83%97%E3%83%88%E7%B5%82%E4%BA%86%E3%81%97%E3%81%A6%E3%82%82%E6%B6%88%E3%81%88%E3%81%AA%E3%81%84/
         [System.GC]::Collect()
     }
+}
+
+function Get-AbsolutePath {
+    param(
+        [string]$Path
+    )
+
+    if (Test-Path -Path $Path) {
+        return (Resolve-Path $Path).Path
+    }
+
+    $message = [String]::Format("ファイル '{0}' が見つかりません。", $Path)
+    throw New-Object "System.ArgumentException" $message
 }
 
 function Get-Table {
