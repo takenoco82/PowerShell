@@ -25,12 +25,7 @@
         foreach ($xlTable in $xlTables) {
             # ヘッダーの項目数チェック
             if ($IsFirst) {
-                if ($Header -ne $null -and $Header.Length -lt $xlTable.ListColumns.Count) {
-                    $ColumnCount = $xlTable.ListColumns.Count
-                    $HeaderStr = $Header -join ", "
-                    Write-Error "ヘッダーの項目数が足りません。テーブルの項目数=$ColumnCount, Header=$HeaderStr"
-                    return
-                }
+                Verify-Header $xlTable $Header
                 $IsFirst = $false
             }
 
@@ -128,6 +123,28 @@ function Get-TableRow {
             }
         }
     }
+}
+
+function Verify-Header {
+    param(
+        [Object]$xlTable,
+        [string[]]$Header
+    )
+
+    if ($null -eq $Header) {
+        return
+    }
+
+    if ($Header.Length -ge $xlTable.ListColumns.Count) {
+        return
+    }
+
+    $message = [String]::Format(
+        "パラメーター '{0}' の数が足りません。テーブル '{1}' の項目数 '{2}' に合わせてパラメーターを指定してください。", 
+        "Header", 
+        $xlTable.Name, 
+        $xlTable.ListColumns.Count)
+    throw New-Object "System.ArgumentException" $message
 }
 
 Export-ModuleMember -Function Import-ExcelTable
