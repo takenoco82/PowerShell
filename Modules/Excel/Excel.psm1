@@ -224,5 +224,4 @@ function Verify-Header {
     throw New-Object "System.ArgumentException" $message
 }
 
-Export-ModuleMember -Function Import-ExcelTable
-Export-ModuleMember -Function Get-ExcelTableName
+Export-ModuleMember -Function Import-ExcelTable, Get-ExcelTableName
