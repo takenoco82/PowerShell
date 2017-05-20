@@ -65,10 +65,7 @@ function Get-Table {
         [string]$TableName
     )
 
-    $cntSheets = $xlBook.Worksheets.Count
-    for ($i = 1; $i -le $cntSheets; $i++) {
-
-        $xlSheet = $xlBook.WorkSheets.Item($i)
+    foreach ($xlSheet in $xlBook.Worksheets) {
         $xlTables = $xlSheet.ListObjects
         foreach ($xlTable in $xlTables) {
             if ($xlTable.Name -eq $TableName) {
