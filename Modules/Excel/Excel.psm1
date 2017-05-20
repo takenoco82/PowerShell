@@ -4,12 +4,12 @@
         [Parameter(Mandatory = $True)]
         [string]$Path,
         [Parameter(Mandatory = $True)]
-        [string]$TableName,
+        [string[]]$TableName,
         [string[]]$Header
     )
 
     Write-Verbose "`$Path=$Path"
-    Write-Verbose "`$TableName=$TableName"
+    if ($TableName -ne $null) { Write-Verbose "`$TableName=$($TableName -join ', ')" }
     if ($Header -ne $null) { Write-Verbose "`$Header=$($Header -join ', ')" }
 
     try {
@@ -23,24 +23,26 @@
         #$xlApp.Visible = $true
 
         $xlBook = $xlApp.Workbooks.Open($Path, 0, $true)
-        $xlTable = Get-Table $xlBook $TableName
+        $xlTables = Get-Table $xlBook $TableName
 
-        # ヘッダーの項目数チェック
-        if ($Header -ne $null -and $Header.Length -lt $xlTable.ListColumns.Count) {
-            $ColumnCount = $xlTable.ListColumns.Count
-            $HeaderStr = $Header -join ", "
-            Write-Error "ヘッダーの項目数が足りません。テーブルの項目数=$ColumnCount, Header=$HeaderStr"
-            return
+        $IsFirst = $true
+        foreach ($xlTable in $xlTables) {
+            # ヘッダーの項目数チェック
+            if ($IsFirst) {
+                if ($Header -ne $null -and $Header.Length -lt $xlTable.ListColumns.Count) {
+                    $ColumnCount = $xlTable.ListColumns.Count
+                    $HeaderStr = $Header -join ", "
+                    Write-Error "ヘッダーの項目数が足りません。テーブルの項目数=$ColumnCount, Header=$HeaderStr"
+                    return
+                }
+                $IsFirst = $false
+            }
+
+            Get-TableRow $xlTable $Header
         }
 
-        # テーブル存在チェック
-        if ($xlTable -eq $null) {
-            Write-Error "テーブルが存在しません。Path=$Path, TableName=$TableName"
-            return
-        }
-
-        Get-TableRow $xlTable $Header
-
+    } catch [System.ArgumentException] {
+        Write-Error $Error[0]
     } catch [System.Exception] {
         Write-Error $Error[0]
     } finally {
@@ -62,21 +64,26 @@
 function Get-Table {
     param(
         [Object]$xlBook,
-        [string]$TableName
+        [string[]]$TableName
     )
 
+    $map = [ordered]@{}
     foreach ($xlSheet in $xlBook.Worksheets) {
         $xlTables = $xlSheet.ListObjects
         foreach ($xlTable in $xlTables) {
-            if ($xlTable.Name -eq $TableName) {
-                $xlSheet = $null
-                return $xlTable
-            }
+            $map.Add($xlTable.Name, $xlTable)
         }
+        $xlSheet = $null
     }
 
-    $xlSheet = $null
-    return $null
+    foreach ($key in $TableName) {
+        if ($map.Contains($key)) {
+            $map.Item($key)
+        } else {
+            $message = [String]::Format("テーブル '{0}' が見つかりません。", $key)
+            throw New-Object "System.ArgumentException" $message
+        }
+    }
 }
 
 function Get-TableRow {
