@@ -357,17 +357,25 @@ function Add-Char ($Session, [String]$Char) {
     # プロンプトカーソル位置の更新
     $Session.PromptCursorPosition.X++
 
-    # 選択カーソル位置がフィルタ結果の最終行を超えないようにする
-    if ($Session.SelectedIndex -gt $Session.ResultObject.Count - 1) {
-        $Session.SelectedIndex = $Session.ResultObject.Count - 1
-    }
-
     # 検索
     Search-Object $Session
+
+    # 選択カーソル位置の補正
+    Update-SelectIndex $Session
 
     # 画面の表示
     Write-Screen $Session
     Out-InfoLog "End   Add-Char"
+}
+
+function Update-SelectIndex ($Session) {
+    if ($Session.ResultObject.Count -eq 0) {
+        # 検索結果が0件の場合は1行目に戻す
+        $Session.SelectedIndex = 0
+    } elseif ($Session.SelectedIndex -gt $Session.ResultObject.Count - 1) {
+        # 選択カーソル位置がフィルタ結果の最終行を超えないようにする
+        $Session.SelectedIndex = $Session.ResultObject.Count - 1
+    }
 }
 
 function Remove-BackwardChar ($Session) {
@@ -383,13 +391,11 @@ function Remove-BackwardChar ($Session) {
     # プロンプトカーソル位置の更新
     $Session.PromptCursorPosition.X--
 
-    # 選択カーソル位置がフィルタ結果の最終行を超えないようにする
-    if ($Session.SelectedIndex -gt $Session.ResultObject.Count - 1) {
-        $Session.SelectedIndex = $Session.ResultObject.Count - 1
-    }
-
     # 検索
     Search-Object $Session
+
+    # 選択カーソル位置の補正
+    Update-SelectIndex $Session
 
     # 画面の表示
     Write-Screen $Session
@@ -408,10 +414,8 @@ function Move-NextPage ($Session) {
     # 検索
     Search-Object $Session
 
-    # 選択カーソル位置がフィルタ結果の最終行を超えないようにする
-    if ($Session.SelectedIndex -gt $Session.ResultObject.Count - 1) {
-        $Session.SelectedIndex = $Session.ResultObject.Count - 1
-    }
+    # 選択カーソル位置の補正
+    Update-SelectIndex $Session
 
     # 画面の表示
     Write-Screen $Session
@@ -430,10 +434,8 @@ function Move-PreviousPage ($Session) {
     # 検索
     Search-Object $Session
 
-    # 選択カーソル位置がフィルタ結果の最終行を超えないようにする
-    if ($Session.SelectedIndex -gt $Session.ResultObject.Count - 1) {
-        $Session.SelectedIndex = $Session.ResultObject.Count - 1
-    }
+    # 選択カーソル位置の補正
+    Update-SelectIndex $Session
 
     # 画面の表示
     Write-Screen $Session
@@ -532,10 +534,8 @@ function SWitch-FilterType ($Session) {
     # 検索
     Search-Object $Session
 
-    # 選択カーソル位置がフィルタ結果の最終行を超えないようにする
-    if ($Session.SelectedIndex -gt $Session.ResultObject.Count - 1) {
-        $Session.SelectedIndex = $Session.ResultObject.Count - 1
-    }
+    # 選択カーソル位置の補正
+    Update-SelectIndex $Session
 
     # 画面の表示
     Write-Screen $Session
@@ -582,17 +582,19 @@ function Write-Screen ($Session, [switch]$NoClear) {
     # フィルタした結果をホスト画面に表示
     #   そのままオブジェクトを標準出力すると、パイプラインで次のコマンドへ送信されてしまうので、
     #   Write-Hostでホスト画面へのみ出力する。
-    $resultTable = Get-ResultTable $Session
-    Write-Item $resultTable -X 0 -Y $CONTEXT.Layout.ResultMarginTop
+    if ($Session.ResultObject.Count -ne 0) {
+        $resultTable = Get-ResultTable $Session
+        Write-Item $resultTable -X 0 -Y $CONTEXT.Layout.ResultMarginTop
 
-    # 選択カーソルを表示する
-    $selectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex
-    Write-Item $resultTable[$selectedIndex - 1] `
-        -X 0 `
-        -Y ($CONTEXT.Layout.ResultMarginTop + $selectedIndex - 1) `
-        -ForegroundColor $CONTEXT.Style.Selected.ForegroundColor `
-        -BackgroundColor $CONTEXT.Style.Selected.BackgroundColor `
-        -NoNewline
+        # 選択カーソルを表示する
+        $selectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex
+        Write-Item $resultTable[$selectedIndex - 1] `
+            -X 0 `
+            -Y ($CONTEXT.Layout.ResultMarginTop + $selectedIndex - 1) `
+            -ForegroundColor $CONTEXT.Style.Selected.ForegroundColor `
+            -BackgroundColor $CONTEXT.Style.Selected.BackgroundColor `
+            -NoNewline
+    }
 
     # カーソルをプロンプトに戻す
     Move-CursorPosition $Session.PromptCursorPosition.X $Session.PromptCursorPosition.Y
