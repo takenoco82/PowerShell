@@ -452,8 +452,26 @@ function Move-SelectedUp ($Session) {
     # 選択カーソル位置の更新
     $Session.SelectedIndex--
 
-    # 画面の表示
-    Write-Screen $Session -NoClear
+    $resultTable = Get-ResultTable $Session
+
+    # カーソル移動前の行の表示色を戻す
+    $preSelectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex + 1
+    Write-Item $resultTable[$preSelectedIndex - 1] `
+        -X 0 `
+        -Y ($CONTEXT.Layout.ResultMarginTop + $preSelectedIndex - 1) `
+        -NoNewline
+
+    # 選択カーソルを表示する
+    $selectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex
+    Write-Item $resultTable[$selectedIndex - 1] `
+        -X 0 `
+        -Y ($CONTEXT.Layout.ResultMarginTop + $selectedIndex - 1) `
+        -ForegroundColor $CONTEXT.Style.Selected.ForegroundColor `
+        -BackgroundColor $CONTEXT.Style.Selected.BackgroundColor `
+        -NoNewline
+
+    # カーソルをプロンプトに戻す
+    Move-CursorPosition $Session.PromptCursorPosition.X $Session.PromptCursorPosition.Y
 }
 
 function Move-SelectedDown ($Session) {
@@ -470,8 +488,27 @@ function Move-SelectedDown ($Session) {
     # 選択カーソル位置の更新
     $Session.SelectedIndex++
 
-    # 画面の表示
-    Write-Screen $Session -NoClear
+    $resultTable = Get-ResultTable $Session
+
+    # カーソル移動前の行の表示色を戻す
+    $preSelectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex - 1
+    Write-Item $resultTable[$preSelectedIndex - 1] `
+        -X 0 `
+        -Y ($CONTEXT.Layout.ResultMarginTop + $preSelectedIndex - 1) `
+        -NoNewline
+
+    # 選択カーソルを表示する
+    $selectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex
+    Write-Item $resultTable[$selectedIndex - 1] `
+        -X 0 `
+        -Y ($CONTEXT.Layout.ResultMarginTop + $selectedIndex - 1) `
+        -ForegroundColor $CONTEXT.Style.Selected.ForegroundColor `
+        -BackgroundColor $CONTEXT.Style.Selected.BackgroundColor `
+        -NoNewline
+
+    # カーソルをプロンプトに戻す
+    Move-CursorPosition $Session.PromptCursorPosition.X $Session.PromptCursorPosition.Y
+
     Out-InfoLog "End   Move-SelectedDown"
 }
 
@@ -542,34 +579,56 @@ function Write-Screen ($Session, [switch]$NoClear) {
     # プロンプトを表示
     Write-Prompt $Session.Query $Session.PromptCursorPosition $Session.FilterType $Session.Offset
 
-    # フィルタ結果の表示位置にカーソルを移動
-    Move-CursorPosition 0 $CONTEXT.Layout.ResultMarginTop
-
     # フィルタした結果をホスト画面に表示
     #   そのままオブジェクトを標準出力すると、パイプラインで次のコマンドへ送信されてしまうので、
     #   Write-Hostでホスト画面へのみ出力する。
+    $resultTable = Get-ResultTable $Session
+    Write-Item $resultTable -X 0 -Y $CONTEXT.Layout.ResultMarginTop
+
+    # 選択カーソルを表示する
+    $selectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex
+    Write-Item $resultTable[$selectedIndex - 1] `
+        -X 0 `
+        -Y ($CONTEXT.Layout.ResultMarginTop + $selectedIndex - 1) `
+        -ForegroundColor $CONTEXT.Style.Selected.ForegroundColor `
+        -BackgroundColor $CONTEXT.Style.Selected.BackgroundColor `
+        -NoNewline
+
+    # カーソルをプロンプトに戻す
+    Move-CursorPosition $Session.PromptCursorPosition.X $Session.PromptCursorPosition.Y
+}
+
+function Get-ResultTable ($Session) {
     $param = $null
     if ($Session.Header -ne $null) {
         $param = @{ Property = $Session.Header }
     }
-    $resultTable = $Session.ResultObject | Format-Table @param | Out-String -Stream
+    $Session.ResultObject | Format-Table @param | Out-String -Stream
+}
 
-    $selectedIndex = $CONTEXT.Layout.SelectedInitialPosition + $Session.SelectedIndex
-    for ($i = 0; $i -lt $resultTable.Count; $i++) {
-        $param = $null
-        if ($Session.NoSelect) {
-            # 選択カーソルを表示しない
-        } elseif ($i -eq ($selectedIndex - 1)) {
-            $param = @{
-                ForegroundColor = $CONTEXT.Style.Selected.ForegroundColor
-                BackgroundColor = $CONTEXT.Style.Selected.BackgroundColor
-            }
-        }
-        Write-Host $resultTable[$i] @param
+function Write-Item {
+    Param(
+        [string[]]$Text,
+        [int]$X,
+        [int]$Y,
+        $ForegroundColor,
+        $BackgroundColor,
+        [switch]$NoNewline 
+    )
+
+    Move-CursorPosition $X $Y
+
+    $param = @{ NoNewline = $NoNewline }
+    if ($ForegroundColor -ne $null) {
+        $param += @{ ForegroundColor = $ForegroundColor }
+    }
+    if ($BackgroundColor -ne $null) {
+        $param += @{ BackgroundColor = $BackgroundColor }
     }
 
-    # カーソルをプロンプトに戻す
-    Move-CursorPosition $Session.PromptCursorPosition.X $Session.PromptCursorPosition.Y
+    foreach ($item in $Text) {
+        Write-Host $item @param
+    }
 }
 
 function Write-Prompt ($Query, $PromptCursorPosition, $FilterType, $Offset) {
