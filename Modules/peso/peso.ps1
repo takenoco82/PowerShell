@@ -102,7 +102,10 @@ function New-Context {
     "FilterType" : null,
     "DefaultCondition" : {
         "FilterType" : "IgnoreCase",
-        "Limit" : null
+        "Limit" : null,
+        "KeywordSeparator" : " ",
+        "PropertyPrefix" : ":",
+        "NotPrefix" : "!"
     },
     "ObjectType" : {
         "System.IO.FileSystemInfo": {
@@ -349,13 +352,19 @@ function Search-Object ($Session) {
 }
 
 function Add-Char ($Session, [String]$Char) {
-    Out-InfoLog "Start Add-Char"
+    Out-InfoLog "Start Add-Char($Char)"
     # 検索条件の更新
     $Session.Query += $Char
     $Session.Offset = 1
 
     # プロンプトカーソル位置の更新
     $Session.PromptCursorPosition.X++
+
+    # 入力された文字がスペースの場合、プロンプトを更新して終了
+    if ($Char -eq $CONTEXT.DefaultCondition.KeywordSeparator) {
+        Write-Prompt $Session.Query $Session.PromptCursorPosition $Session.FilterType $Session.Offset
+        return
+    }
 
     # 検索
     Search-Object $Session
@@ -365,7 +374,7 @@ function Add-Char ($Session, [String]$Char) {
 
     # 画面の表示
     Write-Screen $Session
-    Out-InfoLog "End   Add-Char"
+    Out-InfoLog "End   Add-Char($Char)"
 }
 
 function Update-SelectIndex ($Session) {
@@ -384,12 +393,20 @@ function Remove-BackwardChar ($Session) {
         return
     }
 
+    $isRemovedKeywordSeparator = $Session.Query.EndsWith($CONTEXT.DefaultCondition.KeywordSeparator)
+
     # 検索条件の更新
     $Session.Query = $Session.Query.Substring(0, $Session.Query.Length - 1)
     $Session.Offset = 1
 
     # プロンプトカーソル位置の更新
     $Session.PromptCursorPosition.X--
+
+    # 削除された文字がスペースの場合、プロンプトを更新して終了
+    if ($isRemovedKeywordSeparator) {
+        Write-Prompt $Session.Query $Session.PromptCursorPosition $Session.FilterType $Session.Offset
+        return
+    }
 
     # 検索
     Search-Object $Session
@@ -673,7 +690,16 @@ function Filter-Object {
     )
 
     begin {
-        $searchConditions = Parse-Query $Query $FilterType $DefaultTargetProperty
+        $param = @{
+            Query = $Query
+            FilterType = $FilterType
+            DefaultTargetProperty = $DefaultTargetProperty
+            KeywordSeparator = $CONTEXT.DefaultCondition.KeywordSeparator
+            PropertyPrefix = $CONTEXT.DefaultCondition.PropertyPrefix
+            NotPrefix = $CONTEXT.DefaultCondition.NotPrefix
+        }
+        $searchConditions = Parse-Query @param
+        Out-InfoLog "SearchConditions $SearchConditions"
 
         # クエリにマッチした件数
         $matchCount = 0
