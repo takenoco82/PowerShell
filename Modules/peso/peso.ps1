@@ -99,7 +99,12 @@ function New-Context {
         "SelectedInitialPosition" : null
     },
     "KeyMap" : null,
-    "FilterType" : null,
+    "FilterType" : [
+        "IgnoreCase",
+        "CaseSensitive",
+        "RegExp",
+        "Exact"
+    ],
     "DefaultCondition" : {
         "FilterType" : "IgnoreCase",
         "Limit" : null,
@@ -117,6 +122,16 @@ function New-Context {
             "DefaultTargetProperty" : "CommandLine"
         }
     },
+    "Operator" : [
+        { "Operator": "ceq",       "FilterType": "Exact",         "Not": false },
+        { "Operator": "cne",       "FilterType": "Exact",         "Not": true  },
+        { "Operator": "ilike",     "FilterType": "IgnoreCase",    "Not": false },
+        { "Operator": "inotlike",  "FilterType": "IgnoreCase",    "Not": true  },
+        { "Operator": "clike",     "FilterType": "CaseSensitive", "Not": false },
+        { "Operator": "cnotlike",  "FilterType": "CaseSensitive", "Not": true  },
+        { "Operator": "cmatch",    "FilterType": "RegExp",        "Not": false },
+        { "Operator": "inotmatch", "FilterType": "RegExp",        "Not": true  }
+    ],
     "Debug" : true
 }
 '@
@@ -239,12 +254,6 @@ function New-Context {
         "C-P"         = "SelectUp"
         "C-R"         = "RotateFilter"
         "C-U"         = "KillBeginningOfLine"
-    }
-    $Context.FilterType = [ordered]@{
-        IgnoreCase    = "ilike"
-        CaseSensitive = "clike"
-        RegExp        = "cmatch"
-        Exact         = "ceq"
     }
     $Context
 }
@@ -533,13 +542,10 @@ function Move-SelectedDown ($Session) {
 
 function SWitch-FilterType ($Session) {
     # 検索条件の更新
-    $FilterTypes = @()
-    $CONTEXT.FilterType.Keys.Foreach({ $FilterTypes += $_ })
+    $n = $CONTEXT.FilterType.length
+    $i = $CONTEXT.FilterType.IndexOf($Session.FilterType) + 1
 
-    $n = $FilterTypes.length
-    $i = $FilterTypes.IndexOf($Session.FilterType) + 1
-
-    $Session.FilterType = $FilterTypes[$i % $n]
+    $Session.FilterType = $CONTEXT.FilterType[$i % $n]
     $Session.Offset = 1
 
     # クエリがない場合はプロンプトを書き換えて終了
@@ -757,15 +763,13 @@ function Parse-Query {
         return @()
     }
 
-    $operator = $CONTEXT.FilterType.Item($FilterType)
-    if ($operator -eq $null) {
-        $operator = "ilike"
-    }
+    $operator = $CONTEXT.Operator.Where({ $_.FilterType -eq $FilterType }).Operator
 
     # クエリ文字列をスペースで分割
     $keywords = $Query -split $KeywordSeparator
 
     $targetProperty = $null
+    $not = $false
     $result = @()
     foreach ($keyword in $keywords) {
         # プロパティの判定。1文字目が : かどうか
@@ -776,31 +780,36 @@ function Parse-Query {
             continue
         }
 
+        $pattern = $keyword
         # 否定の判定。1文字目が ! かどうか
-        #if ($keyword.IndexOf($NotPrefix) -eq 0) {
-        #    if ($keyword.length -eq 1) {
-        #        continue
-        #    }
-        #    $pattern = $keyword.Substring(1, $keyword.Length - 1)
-        #}
+        if ($keyword.IndexOf($NotPrefix) -eq 0) {
+            if ($keyword.length -eq 1) {
+                continue
+            }
+            $not = $true
+            $pattern = $keyword.Substring(1, $keyword.Length - 1)
+        }
+
         if ($targetProperty -ne $null) {
             $result += [PSCustomObject] @{
                 TargetProperty = $targetProperty
-                Pattern = $keyword
-                Operator = $operator }
+                Pattern = $pattern
+                Operator = $operator[$not] }
         } elseif ($DefaultTargetProperty -ne $null) {
             $result += [PSCustomObject] @{
                 TargetProperty = $DefaultTargetProperty
-                Pattern = $keyword
-                Operator = $operator }
+                Pattern = $pattern
+                Operator = $operator[$not] }
         } else {
             $result += [PSCustomObject] @{
                 TargetProperty = $null
-                Pattern = $keyword
-                Operator = $operator }
+                Pattern = $pattern
+                Operator = $operator[$not] }
         }
 
+        # プロパティは引き継いだほうがいいかも...
         $targetProperty = $null
+        $not = $false
     }
 
     return $result
