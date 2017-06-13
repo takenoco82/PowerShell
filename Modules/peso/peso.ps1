@@ -699,6 +699,7 @@ function Filter-Object {
         $param = @{
             Query = $Query
             FilterType = $FilterType
+            InputObject = $InputObject
             DefaultTargetProperty = $DefaultTargetProperty
             KeywordSeparator = $CONTEXT.DefaultCondition.KeywordSeparator
             PropertyPrefix = $CONTEXT.DefaultCondition.PropertyPrefix
@@ -721,24 +722,8 @@ function Filter-Object {
                 break
             }
 
-            $isMatch = $true
-            $target = $item.ToString()
-
-            foreach ($searchCondition in $searchConditions) {
-                # プロパティが指定してあったら、プロパティに対して検索する
-                $targetProperty = $searchCondition.TargetProperty
-                if ($targetProperty.Length -ne 0) {
-                    $target = [string]($item."$targetProperty")
-                }
-
-                if (!(Test-Match $target $searchCondition.Pattern $searchCondition.Operator)) {
-                    $isMatch = $false
-                    break
-                }
-            }
-
             # マッチしたオブジェクトを返却
-            if ($isMatch) {
+            if (Test-Match $item $searchConditions) {
                 $matchCount++
                 if ($matchCount -ge $returnIndex) {
                     $item
@@ -753,6 +738,7 @@ function Parse-Query {
     param(
         [string]$Query,
         [string]$FilterType = "IgnoreCase",
+        [Object[]]$InputObject,
         [string]$DefaultTargetProperty,
         [string]$KeywordSeparator = " ",
         [string]$PropertyPrefix = ":",
@@ -774,8 +760,13 @@ function Parse-Query {
     foreach ($keyword in $keywords) {
         # プロパティの判定。1文字目が : かどうか
         if ($keyword.IndexOf($PropertyPrefix) -eq 0) {
-            if ($keyword.length -ne 1) {
-                $targetProperty = $keyword.Substring(1, $keyword.Length - 1)
+            if ($keyword.length -eq 1) {
+                continue
+            }
+            $propertyName = $keyword.Substring(1, $keyword.Length - 1)
+            foreach ($item in $InputObject) {
+                $targetProperty = Get-PropertyNames $item $propertyName
+                break
             }
             continue
         }
@@ -816,6 +807,38 @@ function Parse-Query {
 }
 
 function Test-Match {
+    param(
+        [Object]$Item,
+        $SearchConditions
+    )
+
+    $target = $Item.ToString()
+
+    foreach ($searchCondition in $SearchConditions) {
+        $isMatch = $false
+
+        # プロパティが指定してあったら、プロパティに対して検索する
+        $targetProperties = $searchCondition.TargetProperty
+        foreach ($targetProperty in $targetProperties) {
+            if ($targetProperty.Length -ne 0) {
+                $target = [string]($Item.$($targetProperty))
+            }
+
+            if (Test-MatchInner $target $searchCondition.Pattern $searchCondition.Operator) {
+                $isMatch = $true
+                break
+            }
+        }
+
+        if (-not $isMatch) {
+            return $false
+        }
+    }
+
+    return $true
+}
+
+function Test-MatchInner {
     param(
         [string]$Target,
         [string]$Pattern,
@@ -869,4 +892,17 @@ function Out-InfoLog ([string]$Message) {
 
 function Get-RawUI () {
     (Get-Host).UI.RawUI
+}
+
+function Get-PropertyNames {
+    param(
+        [Parameter(Mandatory=$true)]
+        [Object]$Item,
+        [string]$Name
+    )
+
+    $Item |
+        Get-Member -Name $Name `
+            -MemberType Property, CodeProperty, NoteProperty, AliasProperty, ScriptProperty |
+        % { $_.Name }
 }
