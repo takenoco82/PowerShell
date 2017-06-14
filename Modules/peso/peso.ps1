@@ -16,7 +16,7 @@ function Start-InteractiveFilter {
 
         Backup-ScrBuf $Session
 
-        Out-InfoLog 'Start $Session.InputObject.Add()'
+        Out-Log 'INFO' 'Start' '$Session.InputObject.Add()'
         $buf = New-Object "System.Collections.Generic.List[Object]"
     }
     process {
@@ -27,7 +27,7 @@ function Start-InteractiveFilter {
     }
     end {
         $Session.InputObject = $buf
-        Out-InfoLog 'End   $Session.InputObject.Add()'
+        Out-Log 'INFO' 'End' '$Session.InputObject.Add()'
         foreach ($item in $Session.InputObject) {
             $objectType = $CONTEXT.ObjectType.($item.GetType().FullName)
             if ($objectType -eq $null) {
@@ -50,13 +50,13 @@ function Start-InteractiveFilter {
         Restore-ScrBuf $Session
 
         # フィルタ結果を返却する
-        Out-InfoLog 'Start return $Session.ResultObject'
+        Out-Log 'INFO' 'Start' 'return $Session.ResultObject'
         if ($NoSelect) {
             $Session.ResultObject
         } else {
             $Session.ResultObject[$Session.SelectedIndex]
         }
-        Out-InfoLog 'End   return $Session.ResultObject'
+        Out-Log 'INFO' 'End' 'return $Session.ResultObject'
     }
 }
 
@@ -315,7 +315,7 @@ function Clear-Result ($Session) {
 
 # 初期表示
 function Show-InitialScreen ($Session) {
-    Out-InfoLog "Start Show-InitialScreen"
+    Out-Log 'INFO' 'Start' 'Show-InitialScreen'
     # 検索条件の初期化
     $Session.Query = ""
     $Session.FilterType = $CONTEXT.DefaultCondition.FilterType
@@ -332,7 +332,7 @@ function Show-InitialScreen ($Session) {
 
     # 画面の表示
     Write-Screen $Session
-    Out-InfoLog "End   Show-InitialScreen"
+    Out-Log 'INFO' 'End' 'Show-InitialScreen'
 }
 
 function Search-Object ($Session) {
@@ -361,7 +361,8 @@ function Search-Object ($Session) {
 }
 
 function Add-Char ($Session, [String]$Char) {
-    Out-InfoLog "Start Add-Char($Char)"
+    Out-Log 'INFO' 'Start' 'Add-Char'
+    Out-Log 'DEBUG' 'Add-Char' '$Char' $Char
     # 検索条件の更新
     $Session.Query += $Char
     $Session.Offset = 1
@@ -383,7 +384,7 @@ function Add-Char ($Session, [String]$Char) {
 
     # 画面の表示
     Write-Screen $Session
-    Out-InfoLog "End   Add-Char($Char)"
+    Out-Log 'INFO' 'End' 'Add-Char'
 }
 
 function Update-SelectIndex ($Session) {
@@ -454,7 +455,7 @@ function Remove-HeadLine ($Session) {
 }
 
 function Move-NextPage ($Session) {
-    Out-InfoLog "Start Move-NextPage"
+    Out-Log 'INFO' 'Start' 'Move-NextPage'
     # 次ページがない場合は何もしない
     if (-not $Session.HasNextPage) {
         return
@@ -471,7 +472,7 @@ function Move-NextPage ($Session) {
 
     # 画面の表示
     Write-Screen $Session
-    Out-InfoLog "End   Move-NextPage"
+    Out-Log 'INFO' 'End' 'Move-NextPage'
 }
 
 function Move-PreviousPage ($Session) {
@@ -529,7 +530,7 @@ function Move-SelectedUp ($Session) {
 }
 
 function Move-SelectedDown ($Session) {
-    Out-InfoLog "Start Move-SelectedDown"
+    Out-Log 'INFO' 'Start' 'Move-SelectedDown'
     if ($Session.NoSelect) {
         return
     }
@@ -563,7 +564,7 @@ function Move-SelectedDown ($Session) {
     # カーソルをプロンプトに戻す
     Move-CursorPosition $Session.PromptCursorPosition.X $Session.PromptCursorPosition.Y
 
-    Out-InfoLog "End   Move-SelectedDown"
+    Out-Log 'INFO' 'End' 'Move-SelectedDown'
 }
 
 function SWitch-FilterType ($Session) {
@@ -596,25 +597,25 @@ function SWitch-FilterType ($Session) {
 # スクリーンバッファのバックアップ
 # http://d.hatena.ne.jp/newpops/20080514/p1
 function Backup-ScrBuf ($Session) {
-    Out-InfoLog "Start Backup-ScrBuf"
+    Out-Log 'INFO' 'Start' 'Backup-ScrBuf'
     $rect = New-Object System.Management.Automation.Host.Rectangle
     $rect.Left   = 0
     $rect.Top    = 0
     $rect.Right  = (Get-RawUI).WindowSize.Width  # コンソールWindowの横幅
     $rect.Bottom = (Get-RawUI).CursorPosition.Y  # 現在カーソル位置の行
     $Session.Screen = (Get-RawUI).GetBufferContents($rect)
-    Out-InfoLog "End   Backup-ScrBuf"
+    Out-Log 'INFO' 'End' 'Backup-ScrBuf'
 }
 
 # スクリーンバッファのリストア
 function Restore-ScrBuf ($Session) {
-    Out-InfoLog 'Start Restore-ScrBuf'
+    Out-Log 'INFO' 'Start' 'Restore-ScrBuf'
     Clear-Host
     $origin = New-Object System.Management.Automation.Host.Coordinates(0, 0)
     (Get-RawUI).SetBufferContents($origin, $Session.Screen)
     $pos = New-Object System.Management.Automation.Host.Coordinates(0, $Session.Screen.GetUpperBound(0))
     (Get-RawUI).CursorPosition = $pos
-    Out-InfoLog 'End   Restore-ScrBuf'
+    Out-Log 'INFO' 'End' 'Restore-ScrBuf'
 }
 
 #=============================================================================
@@ -732,7 +733,6 @@ function Filter-Object {
             NotPrefix = $CONTEXT.DefaultCondition.NotPrefix
         }
         $searchConditions = Parse-Query @param
-        Out-InfoLog "SearchConditions $SearchConditions"
 
         # クエリにマッチした件数
         $matchCount = 0
@@ -775,6 +775,9 @@ function Parse-Query {
         return @()
     }
 
+    Out-Log 'DEBUG' 'Parse-Query' '$Query' $Query
+    Out-Log 'DEBUG' 'Parse-Query' '$FilterType' $FilterType
+    Out-Log 'DEBUG' 'Parse-Query' '$DefaultTargetProperty' $DefaultTargetProperty
     $operator = $CONTEXT.Operator.Where({ $_.FilterType -eq $FilterType }).Operator
 
     # クエリ文字列をスペースで分割
@@ -829,6 +832,7 @@ function Parse-Query {
         $not = $false
     }
 
+    Out-Log 'DEBUG' 'Parse-Query' '$result' (ConvertTo-Json $result -Compress)
     return $result
 }
 
@@ -909,10 +913,23 @@ function Get-DefaultLimit () {
     return $WindowHeight - $CONTEXT.Layout.SelectedInitialPosition - $CONTEXT.Layout.MarginBottom
 }
 
-function Out-InfoLog ([string]$Message) {
+function Out-Log  {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$true)]
+        [ValidateSet("ERROR", "WARN", "INFO", "DEBUG")]
+        [string]$Level,
+        [Parameter(ValueFromRemainingArguments=$true)]
+        [object[]]$Messages
+    )
+
     if ($CONTEXT.Debug) {
-        $format = [string]::Format("{0} {1}", ((Get-Date).ToString("yyyy-MM-dd HH:mm:ss.fff")), $Message)
-        $format | Out-File -FilePath "$env:TMP\peso.log" -Encoding utf8 -Append
+        $message = $Messages.ForEach({ @($_) -join ", " }) -join "`t"
+        [string]::Format("{0}`t{1}`t{2}",
+            (Get-Date).ToString("yyyy-MM-dd HH:mm:ss.fff"),
+            $Level,
+            $message) |
+            Out-File -FilePath "$env:TMP\peso.log" -Encoding utf8 -Append
     }
 }
 
