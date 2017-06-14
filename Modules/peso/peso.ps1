@@ -288,7 +288,7 @@ function Invoke-Action ($Session, [string]$Action, [string]$Char) {
         "AddChar"             { Add-Char $Session $Char; break }
         "DeleteBackwardChar"  { Remove-BackwardChar $Session; break }
         "DeleteForwardChar"   { Do-Something; break }
-        "KillBeginningOfLine" { Do-Something; break }
+        "KillBeginningOfLine" { Remove-HeadLine $Session; break }
         "KillEndOfLine"       { Do-Something; break }
         "ScrollPageUp"        { Move-PreviousPage $Session; break }
         "ScrollPageDown"      { Move-NextPage $Session; break }
@@ -416,6 +416,32 @@ function Remove-BackwardChar ($Session) {
         Write-Prompt $Session.Query $Session.PromptCursorPosition $Session.FilterType $Session.Offset
         return
     }
+
+    # 検索
+    Search-Object $Session
+
+    # 選択カーソル位置の補正
+    Update-SelectIndex $Session
+
+    # 画面の表示
+    Write-Screen $Session
+}
+
+function Remove-HeadLine ($Session) {
+    $removedQueryLength = $Session.PromptCursorPosition.X - $CONTEXT.Prompt.Length
+
+    # カーソル位置が行頭の場合は何もしない
+    if ($removedQueryLength -eq 0) {
+        return
+    }
+
+    # 検索条件の更新
+    $Session.Query = $Session.Query.Substring($removedQueryLength,
+        $Session.Query.Length - $removedQueryLength)
+    $Session.Offset = 1
+
+    # プロンプトカーソル位置の初期化
+    $Session.PromptCursorPosition.X = $CONTEXT.Prompt.Length
 
     # 検索
     Search-Object $Session
