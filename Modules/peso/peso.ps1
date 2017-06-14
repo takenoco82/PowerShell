@@ -628,7 +628,7 @@ function Get-ResultTable ($Session) {
     if ($Session.Header -ne $null) {
         $param = @{ Property = $Session.Header }
     }
-    $Session.ResultObject | Format-Table @param | Out-String -Stream
+    $Session.ResultObject | Format-Table -AutoSize @param | Out-String -Stream
 }
 
 function Write-Item {
